@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<base href="./">
+
+<script>
+(function(){
+  const t = localStorage.getItem('portal_theme')||'dark';
+  if(t==='light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Панель администратора</title>
+<script>
+(function(){
+  const raw = sessionStorage.getItem('psess_user');
+  if(!raw){window.location.href='./auth.html';return;}
+  try{ const u=JSON.parse(raw); if(u.role!=='admin') window.location.href='./index.html'; }
+  catch(e){ window.location.href='./auth.html'; }
+})();
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b1120;--bg2:#111827;--bg3:#1a2235;
+  --card:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);
+  --text:#e8edf8;--text2:rgba(255,255,255,0.5);--text3:rgba(255,255,255,0.25);
+  --accent:#1976d2;--accent2:rgba(25,118,210,0.15);
+  --green:#22c55e;--red:#ef4444;--yellow:#f59e0b;
+  --radius:14px;--shadow:0 4px 24px rgba(0,0,0,0.4);
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+
+/* ══ TOPBAR ══ */
+.topbar{height:56px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  position:sticky;top:0;z-index:200;backdrop-filter:blur(12px)}
+.tb-left{display:flex;align-items:center;gap:10px}
+.tb-logo{font-size:22px}
+.tb-title{font-size:15px;font-weight:800}
+.tb-badge{background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px}
+.tb-right{display:flex;align-items:center;gap:8px}
+.tb-name{font-size:13px;color:var(--text2)}
+.btn-sm-icon{background:none;border:1px solid var(--border);color:var(--text2);
+  padding:6px 12px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;
+  font-weight:600;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.btn-sm-icon:hover{background:var(--bg3);color:var(--text)}
+.btn-logout{border-color:rgba(239,68,68,0.3);color:#fca5a5}
+.btn-logout:hover{background:rgba(239,68,68,0.1)}
+
+/* ══ LAYOUT ══ */
+.layout{display:flex;flex:1;overflow:hidden;height:calc(100vh - 56px)}
+
+/* ══ SIDEBAR ══ */
+.sidebar{width:210px;background:rgba(255,255,255,0.02);border-right:1px solid var(--border);
+  padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex-shrink:0}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;
+  cursor:pointer;color:var(--text2);font-size:14px;font-weight:600;transition:all .2s;
+  border:none;background:none;font-family:inherit;width:100%;text-align:left;position:relative}
+.nav-btn:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+.nav-btn.active{background:var(--accent2);color:#60a5fa;border:1px solid rgba(25,118,210,0.2)}
+.nav-icon{font-size:17px;flex-shrink:0}
+.nav-divider{height:1px;background:var(--border);margin:8px 6px}
+
+/* ══ MAIN ══ */
+.main{flex:1;overflow-y:auto;padding:24px;min-width:0}
+
+/* ══ СТРАНИЦА ══ */
+.pg{display:none;animation:fadeUp .25s ease}
+.pg.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.pg-head{margin-bottom:20px}
+.pg-title{font-size:21px;font-weight:800;color:var(--text)}
+.pg-sub{font-size:13px;color:var(--text2);margin-top:3px}
+
+/* ══ КАРТОЧКА ══ */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin-bottom:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+
+/* ══ СТАТЫ ══ */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;transition:border-color .2s}
+.stat:hover{border-color:var(--accent)}
+.stat-n{font-size:30px;font-weight:800;color:var(--accent)}
+.stat-l{font-size:12px;color:var(--text2);margin-top:3px}
+
+/* ══ ТАБЛИЦА ══ */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:11px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.tbl td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,0.02)}
+.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1976d2,#7c3aed);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-admin{background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.2)}
+.badge-teacher{background:rgba(25,118,210,0.12);color:#93c5fd;border:1px solid rgba(25,118,210,0.2)}
+.badge-ok{background:rgba(34,197,94,0.12);color:#86efac;border:1px solid rgba(34,197,94,0.2)}
+.badge-warn{background:rgba(245,158,11,0.12);color:#fcd34d;border:1px solid rgba(245,158,11,0.2)}
+
+/* ══ КНОПКИ ══ */
+.btn{padding:8px 16px;border-radius:10px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 12px rgba(25,118,210,0.3)}
+.btn-primary:hover{background:#1565c0;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.btn-ghost{background:rgba(255,255,255,0.05);color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,0.09);color:var(--text)}
+.btn-danger{background:rgba(239,68,68,0.1);color:#fca5a5;border:1px solid rgba(239,68,68,0.2)}
+.btn-danger:hover{background:rgba(239,68,68,0.18)}
+.btn-xs{padding:5px 10px;font-size:11px;border-radius:8px}
+
+/* ══ ФОРМА ══ */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg.one{grid-template-columns:1fr}
+.fg.three{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:600px){.fg,.fg.three{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.field input,.field select,.field textarea{
+  background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;
+  padding:10px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:all .2s;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent2)}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3)}
+.field select option{background:#1a2235}
+.field textarea{resize:vertical;min-height:80px}
+.span2{grid-column:1/-1}
+
+/* ══ UPLOAD ZONE ══ */
+.upload-zone{
+  border:2px dashed rgba(25,118,210,0.3);border-radius:var(--radius);
+  padding:40px 20px;text-align:center;cursor:pointer;transition:all .3s;
+  position:relative;background:rgba(25,118,210,0.03)}
+.upload-zone:hover,.upload-zone.over{
+  border-color:var(--accent);background:rgba(25,118,210,0.08);transform:scale(1.01)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.uz-icon{font-size:48px;margin-bottom:12px;display:block;filter:drop-shadow(0 0 16px rgba(25,118,210,0.4))}
+.uz-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
+.uz-sub{font-size:13px;color:var(--text2)}
+.uz-hint{font-size:12px;color:var(--text3);margin-top:4px}
+
+/* ══ ФАЙЛ ВЫБРАН ══ */
+.file-chosen{
+  border:2px solid var(--accent);background:rgba(25,118,210,0.08);
+  border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:14px}
+.fc-icon{font-size:32px;flex-shrink:0}
+.fc-name{font-weight:700;font-size:14px;color:var(--text);word-break:break-all}
+.fc-size{font-size:12px;color:var(--text2);margin-top:2px}
+.fc-change{margin-left:auto;flex-shrink:0}
+
+/* ══ ПРОГРЕСС ══ */
+.prog-wrap{margin-top:14px}
+.prog-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:4px;width:0%;transition:width .4s ease}
+.prog-text{font-size:12px;color:var(--text2);margin-top:6px;text-align:center}
+
+/* ══ МАТЕРИАЛ КАРТОЧКА ══ */
+.mat-card{display:flex;align-items:flex-start;gap:12px;padding:14px;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:8px;transition:all .2s}
+.mat-card:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.12)}
+.mat-fi{font-size:30px;flex-shrink:0;padding-top:2px}
+.mat-info{flex:1;min-width:0}
+.mat-title{font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mat-desc{font-size:12px;color:var(--text2);margin-bottom:4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mat-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;
+  background:var(--accent2);color:#60a5fa;border:1px solid rgba(25,118,210,0.2)}
+.mat-date{font-size:11px;color:var(--text3)}
+.mat-actions{display:flex;gap:6px;flex-shrink:0;align-items:flex-start}
+
+/* ══ ПРЕВЬЮ ══ */
+.preview-modal{
+  position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.85);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  animation:fadeUp .2s ease}
+.preview-box{
+  background:var(--bg2);border:1px solid var(--border);border-radius:20px;
+  width:100%;max-width:800px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.preview-head{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border)}
+.preview-title{font-weight:700;font-size:15px;color:var(--text)}
+.preview-body{flex:1;overflow:auto}
+.preview-body iframe{width:100%;height:60vh;border:none}
+.preview-pdf-hint{padding:40px;text-align:center;color:var(--text2)}
+
+/* ══ АЛЕРТ ══ */
+.alert{padding:12px 16px;border-radius:12px;font-size:13px;font-weight:600;
+  margin-top:12px;display:none;animation:fadeUp .2s ease}
+.alert-ok{background:rgba(34,197,94,0.1);color:#86efac;border:1px solid rgba(34,197,94,0.25)}
+.alert-err{background:rgba(239,68,68,0.1);color:#fca5a5;border:1px solid rgba(239,68,68,0.25)}
+.alert-info{background:var(--accent2);color:#93c5fd;border:1px solid rgba(25,118,210,0.25)}
+
+/* ══ ТОСТ ══ */
+#toast{position:fixed;bottom:24px;right:24px;padding:13px 20px;border-radius:12px;
+  font-size:14px;font-weight:700;z-index:9999;display:none;
+  animation:toastIn .3s ease;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+#toast.ok{background:#059669;color:#fff}
+#toast.err{background:#dc2626;color:#fff}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══ EMPTY ══ */
+.empty{text-align:center;padding:48px 20px;color:var(--text3)}
+.empty-icon{font-size:44px;margin-bottom:12px}
+.empty-text{font-size:14px}
+
+/* ══ MOBILE BOTTOM NAV ══ */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;
+  background:var(--bg2);border-top:1px solid var(--border);
+  z-index:100;padding:8px 4px}
+.mobile-nav-inner{display:flex;justify-content:space-around}
+.mob-btn{display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 12px;border-radius:10px;border:none;background:none;
+  cursor:pointer;font-family:inherit;color:var(--text2);transition:all .2s}
+.mob-btn.active{color:var(--accent)}
+.mob-btn span:first-child{font-size:20px}
+.mob-btn span:last-child{font-size:10px;font-weight:700}
+@media(max-width:768px){
+  .sidebar{display:none}
+  .mobile-nav{display:block}
+  .main{padding:16px;padding-bottom:80px}
+}
+
+/* ══ РАЗДЕЛИТЕЛЬ СЕКЦИЙ ══ */
+.section-sep{display:flex;align-items:center;gap:10px;margin:20px 0 14px}
+.section-sep span{font-size:13px;font-weight:700;color:var(--text2)}
+.section-sep::before,.section-sep::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    @media (max-width: 480px) {
+      .main { padding: 12px; padding-bottom: 80px; }
+      .topbar { padding: 0 12px; }
+      .tb-title { font-size: 14px; }
+      .pg-title { font-size: 18px; }
+      .fg { grid-template-columns: 1fr; }
+      .field input, .field select, .field textarea { font-size: 16px; }
+      .tbl th, .tbl td { padding: 8px 8px; font-size: 12px; }
+    }
+</style>
+
+<style id="theme-vars">
+[data-theme="light"]{
+  --bg:#f0f4f8 !important;--bg2:#e4eaf2 !important;--bg3:#dae2ed !important;
+  --card:#ffffff !important;--border:rgba(0,0,0,0.09) !important;
+  --text:#1a2234 !important;--text2:#4a5f82 !important;--text3:#8a9ab8 !important;
+}
+</style>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="tb-left">
+    <span class="tb-logo">🛡️</span>
+    <span class="tb-title">Администратор</span>
+    <span class="tb-badge">ADMIN</span>
+  </div>
+  <div class="tb-right">
+    <span class="tb-name" id="tb-name"></span>
+    <a href="index.html" class="btn-sm-icon">🌐 Сайт</a>
+    <button class="btn-sm-icon btn-logout" onclick="logout()">Выйти</button>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <button class="nav-btn active" data-pg="dashboard" onclick="showPg('dashboard',this)">
+      <span class="nav-icon">📊</span>Дашборд
+    </button>
+    <button class="nav-btn" data-pg="upload" onclick="showPg('upload',this)">
+      <span class="nav-icon">⬆️</span>Загрузить файл
+    </button>
+    <div class="nav-divider"></div>
+    <button class="nav-btn" data-pg="materials" onclick="showPg('materials',this)">
+      <span class="nav-icon">📁</span>Материалы
+    </button>
+    <div class="nav-divider"></div>
+    <button class="nav-btn" data-pg="teachers" onclick="showPg('teachers',this)">
+      <span class="nav-icon">👩‍🏫</span>Педагоги
+    </button>
+    <button class="nav-btn" data-pg="users" onclick="showPg('users',this)">
+      <span class="nav-icon">👥</span>Участники
+    </button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main" id="main-content">
+
+    <!-- ══ ДАШБОРД ══ -->
+    <div class="pg active" id="pg-dashboard">
+      <div class="pg-head">
+        <div class="pg-title">📊 Дашборд</div>
+        <div class="pg-sub">Статистика портала</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="s-users">—</div><div class="stat-l">Пользователей</div></div>
+        <div class="stat"><div class="stat-n" id="s-teachers">—</div><div class="stat-l">Педагогов</div></div>
+        <div class="stat"><div class="stat-n" id="s-mats">—</div><div class="stat-l">Материалов</div></div>
+        <div class="stat"><div class="stat-n" id="s-sess">—</div><div class="stat-l">Активных сессий</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Последние регистрации</span>
+          <button class="btn btn-ghost btn-xs" onclick="loadDashboard()">🔄</button></div>
+        <div id="dash-recent"></div>
+      </div>
+    </div>
+
+    <!-- ══ ЗАГРУЗИТЬ ФАЙЛ ══ -->
+    <div class="pg" id="pg-upload">
+      <div class="pg-head">
+        <div class="pg-title">⬆️ Загрузить файл</div>
+        <div class="pg-sub">Добавить материал на портал — он сразу появится на сайте</div>
+      </div>
+      <div class="card">
+        <!-- Дроп-зона -->
+        <div id="upload-zone-wrap">
+          <div class="upload-zone" id="upload-zone"
+            ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
+            <input type="file" id="u-file" accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx" onchange="onFileSelect(this)">
+            <span class="uz-icon">📂</span>
+            <div class="uz-title">Перетащите файл или нажмите сюда</div>
+            <div class="uz-sub">Файл сразу опубликуется на портале</div>
+            <div class="uz-hint">PDF · PPTX · DOCX · XLSX · до 50MB</div>
+          </div>
+        </div>
+
+        <!-- Выбранный файл -->
+        <div id="file-chosen-wrap" style="display:none">
+          <div class="file-chosen">
+            <div class="fc-icon" id="fc-icon">📄</div>
+            <div>
+              <div class="fc-name" id="fc-name"></div>
+              <div class="fc-size" id="fc-size"></div>
+            </div>
+            <button class="btn btn-ghost btn-xs fc-change" onclick="resetFile()">Изменить</button>
+          </div>
+        </div>
+
+        <!-- Форма -->
+        <div id="upload-form" style="display:none;margin-top:16px">
+          <div class="section-sep"><span>Информация о файле</span></div>
+          <div class="fg" style="margin-bottom:12px">
+            <div class="field">
+              <label>Название *</label>
+              <input type="text" id="u-title" placeholder="Название документа">
+            </div>
+            <div class="field">
+              <label>Раздел публикации *</label>
+              <select id="u-section">
+                <option value="metodichka">📚 Методическая копилка</option>
+                <option value="presentations">📊 Презентации</option>
+                <option value="talks">💬 Полезные беседы</option>
+              </select>
+            </div>
+            <div class="field span2">
+              <label>Описание</label>
+              <textarea id="u-desc" placeholder="Краткое описание содержания..."></textarea>
+            </div>
+          </div>
+
+          <!-- Прогресс -->
+          <div class="prog-wrap" id="prog-wrap" style="display:none">
+            <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+            <div class="prog-text" id="prog-text">Загрузка...</div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="btn-upload" onclick="doUpload()">
+              <span>🚀 Опубликовать на портале</span>
+            </button>
+            <button class="btn btn-ghost" onclick="resetFile()">Отмена</button>
+          </div>
+          <div class="alert" id="alert-upload"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ МАТЕРИАЛЫ ══ -->
+    <div class="pg" id="pg-materials">
+      <div class="pg-head">
+        <div class="pg-title">📁 Материалы</div>
+        <div class="pg-sub">Все опубликованные файлы</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Файлы</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="mat-filter" onchange="loadMaterials()"
+              style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+                     padding:6px 10px;border-radius:8px;font-family:inherit;font-size:12px">
+              <option value="">Все разделы</option>
+              <option value="metodichka">📚 Методичка</option>
+              <option value="presentations">📊 Презентации</option>
+              <option value="talks">💬 Беседы</option>
+            </select>
+            <button class="btn btn-ghost btn-xs" onclick="loadMaterials()">🔄</button>
+          </div>
+        </div>
+        <div id="mat-list"></div>
+      </div>
+    </div>
+
+    <!-- ══ ПЕДАГОГИ ══ -->
+    <div class="pg" id="pg-teachers">
+      <div class="pg-head">
+        <div class="pg-title">👩‍🏫 Педагоги</div>
+        <div class="pg-sub">Управление аккаунтами педагогов</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">➕ Добавить педагога</span></div>
+        <div class="fg">
+          <div class="field">
+            <label>Имя и фамилия *</label>
+            <input type="text" id="t-name" placeholder="Например: Айгуль Сейткали">
+          </div>
+          <div class="field">
+            <label>Логин *</label>
+            <input type="text" id="t-login" placeholder="aigyul_seitkali" autocapitalize="none">
+          </div>
+          <div class="field">
+            <label>Временный пароль *</label>
+            <input type="text" id="t-pwd" placeholder="Педагог сменит при первом входе">
+          </div>
+          <div class="field" style="justify-content:flex-end">
+            <button class="btn btn-primary" onclick="addTeacher()" style="width:100%;justify-content:center;padding:11px">
+              ➕ Создать аккаунт
+            </button>
+          </div>
+        </div>
+        <div class="alert" id="alert-teacher"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Список педагогов</span>
+          <button class="btn btn-ghost btn-xs" onclick="loadTeachers()">🔄</button>
+        </div>
+        <div id="teachers-list"></div>
+      </div>
+    </div>
+
+    <!-- ══ УЧАСТНИКИ ══ -->
+    <div class="pg" id="pg-users">
+      <div class="pg-head">
+        <div class="pg-title">👥 Участники</div>
+        <div class="pg-sub">Все зарегистрированные пользователи</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Пользователи</span>
+          <button class="btn btn-ghost btn-xs" onclick="loadUsers()">🔄</button>
+        </div>
+        <div id="users-list"></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- MOBILE NAV -->
+<div class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mob-btn active" data-pg="dashboard" onclick="showPg('dashboard',this)">
+      <span>📊</span><span>Главная</span>
+    </button>
+    <button class="mob-btn" data-pg="upload" onclick="showPg('upload',this)">
+      <span>⬆️</span><span>Загрузить</span>
+    </button>
+    <button class="mob-btn" data-pg="materials" onclick="showPg('materials',this)">
+      <span>📁</span><span>Файлы</span>
+    </button>
+    <button class="mob-btn" data-pg="teachers" onclick="showPg('teachers',this)">
+      <span>👩‍🏫</span><span>Педагоги</span>
+    </button>
+    <button class="mob-btn" data-pg="users" onclick="showPg('users',this)">
+      <span>👥</span><span>Люди</span>
+    </button>
+  </div>
+</div>
+
+<!-- ПРЕВЬЮ МОДАЛ -->
+<div class="preview-modal" id="preview-modal" style="display:none" onclick="closePreview(event)">
+  <div class="preview-box" onclick="event.stopPropagation()">
+    <div class="preview-head">
+      <span class="preview-title" id="preview-title">Просмотр</span>
+      <button class="btn btn-ghost btn-xs" onclick="closePreview()">✕ Закрыть</button>
+    </div>
+    <div class="preview-body" id="preview-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ══════════════════════════
+   CONFIG
+══════════════════════════ */
+const SB_URL  = 'https://ljtogliylpubvkckpwyv.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqdG9nbGl5bHB1YnZrY2twd3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNzEzODQsImV4cCI6MjA4ODc0NzM4NH0.91EQ_EEfi8X09Vm0jmH12_35R6tf0BwtTGoX3K5lgfc';
+const SALT    = 'pedagog_sko_2025_';
+const TG_BOT  = '8222635506:AAGalT-Y-31jQ6VWKZHBcqqmeGc27M_c1Lk';
+const TG_CHAT = '8129422076';
+const BUCKET  = 'pedagog-files';
+
+let adminUser = null;
+let _selFile  = null;
+
+/* ══ INIT ══ */
+document.addEventListener('DOMContentLoaded', () => {
+  const raw = sessionStorage.getItem('psess_user');
+  if (raw) { adminUser = JSON.parse(raw); document.getElementById('tb-name').textContent = adminUser.name; }
+  loadDashboard();
+});
+
+/* ══ SUPABASE ══ */
+async function sb(path, opts = {}) {
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+      headers: {
+        'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON,
+        'Content-Type': 'application/json',
+        'Prefer': opts.prefer || (opts.method === 'POST' ? 'return=representation' : 'return=minimal'),
+        ...(opts.headers || {})
+      },
+      signal: ctrl.signal, ...opts
+    });
+    clearTimeout(tid);
+    if (opts.method === 'DELETE' || (opts.method === 'PATCH' && !opts.prefer)) return true;
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || data.error || r.statusText);
+    return data;
+  } catch(e) { clearTimeout(tid); throw e; }
+}
+
+/* ══ SHA256 ══ */
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ══ XSS ══ */
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ══ TOAST ══ */
+let _toastTimer;
+function toast(msg, type='ok') {
+  clearTimeout(_toastTimer);
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast '+type; el.style.display = 'block';
+  _toastTimer = setTimeout(() => el.style.display='none', 3500);
+}
+
+/* ══ ALERT ══ */
+function showAlert(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = 'alert alert-'+type; el.textContent = msg; el.style.display = 'block';
+}
+function hideAlert(id) { document.getElementById(id).style.display = 'none'; }
+
+/* ══ НАВИГАЦИЯ ══ */
+function showPg(name, btn) {
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn,.mob-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pg-'+name).classList.add('active');
+  document.querySelectorAll('[data-pg="'+name+'"]').forEach(b => b.classList.add('active'));
+  if (name==='dashboard') loadDashboard();
+  if (name==='materials') loadMaterials();
+  if (name==='teachers')  loadTeachers();
+  if (name==='users')     loadUsers();
+}
+
+/* ══ LOGOUT ══ */
+function logout() {
+  localStorage.removeItem('psess_token');
+  sessionStorage.removeItem('psess_token');
+  sessionStorage.removeItem('psess_user');
+  window.location.href='./auth.html';
+}
+
+/* ══ TELEGRAM ══ */
+function tgSend(text) {
+  fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({chat_id:TG_CHAT,text,parse_mode:'HTML'})
+  }).catch(()=>{});
+}
+
+/* ════════════════════════
+   ДАШБОРД
+════════════════════════ */
+async function loadDashboard() {
+  try {
+    const [users, mats, sess] = await Promise.all([
+      sb('pedagog_users?select=id,name,role,created_at&order=created_at.desc'),
+      sb('pedagog_materials?select=id'),
+      sb('user_sessions?select=id&expires_at=gte.'+encodeURIComponent(new Date().toISOString()))
+    ]);
+    const teachers = (users||[]).filter(u => u.role==='teacher');
+    document.getElementById('s-users').textContent    = (users||[]).length;
+    document.getElementById('s-teachers').textContent = teachers.length;
+    document.getElementById('s-mats').textContent     = (mats||[]).length;
+    document.getElementById('s-sess').textContent     = (sess||[]).length;
+
+    const el = document.getElementById('dash-recent');
+    const recent = (users||[]).slice(0,6);
+    if (!recent.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Нет пользователей</div></div>'; return; }
+    el.innerHTML = recent.map(u => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div class="av">${(u.name||'?')[0].toUpperCase()}</div>
+        <div style="flex:1"><div style="font-weight:700;font-size:14px">${esc(u.name)}</div>
+          <div style="font-size:12px;color:var(--text3)">${new Date(u.created_at).toLocaleDateString('ru-RU')}</div></div>
+        <span class="badge ${u.role==='admin'?'badge-admin':'badge-teacher'}">${u.role}</span>
+      </div>`).join('');
+  } catch(e) { toast('Ошибка дашборда: '+e.message,'err'); }
+}
+
+/* ════════════════════════
+   ЗАГРУЗКА ФАЙЛА
+════════════════════════ */
+const FILE_ICONS = {pdf:'📄',pptx:'📊',ppt:'📊',docx:'📝',doc:'📝',xlsx:'📈',xls:'📈'};
+const SEC_NAMES  = {metodichka:'📚 Методичка',presentations:'📊 Презентации',talks:'💬 Беседы'};
+
+function onDragOver(e)  { e.preventDefault(); document.getElementById('upload-zone').classList.add('over'); }
+function onDragLeave()  { document.getElementById('upload-zone').classList.remove('over'); }
+function onDrop(e)      { e.preventDefault(); onDragLeave(); if(e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]); }
+function onFileSelect(inp) { if(inp.files[0]) selectFile(inp.files[0]); }
+
+function selectFile(file) {
+  _selFile = file;
+  const ext = file.name.split('.').pop().toLowerCase();
+  // Показываем выбранный файл
+  document.getElementById('upload-zone-wrap').style.display = 'none';
+  document.getElementById('file-chosen-wrap').style.display = 'block';
+  document.getElementById('upload-form').style.display      = 'block';
+  document.getElementById('fc-icon').textContent = FILE_ICONS[ext]||'📎';
+  document.getElementById('fc-name').textContent = file.name;
+  document.getElementById('fc-size').textContent = (file.size/1024/1024).toFixed(2)+' MB';
+  // Автозаполняем название
+  const titleEl = document.getElementById('u-title');
+  if (!titleEl.value) titleEl.value = file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  hideAlert('alert-upload');
+}
+
+function resetFile() {
+  _selFile = null;
+  document.getElementById('upload-zone-wrap').style.display = 'block';
+  document.getElementById('file-chosen-wrap').style.display = 'none';
+  document.getElementById('upload-form').style.display      = 'none';
+  document.getElementById('u-title').value = '';
+  document.getElementById('u-desc').value  = '';
+  document.getElementById('u-file').value  = '';
+  document.getElementById('prog-wrap').style.display = 'none';
+  document.getElementById('prog-fill').style.width   = '0%';
+  hideAlert('alert-upload');
+}
+
+async function doUpload() {
+  const title   = document.getElementById('u-title').value.trim();
+  const section = document.getElementById('u-section').value;
+  const desc    = document.getElementById('u-desc').value.trim();
+  if (!title)   { showAlert('alert-upload','err','❌ Введите название'); return; }
+  if (!_selFile){ showAlert('alert-upload','err','❌ Файл не выбран'); return; }
+  if (_selFile.size > 50*1024*1024) { showAlert('alert-upload','err','❌ Файл больше 50MB'); return; }
+
+  const btn = document.getElementById('btn-upload');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳ Публикую...</span>';
+
+  const progWrap = document.getElementById('prog-wrap');
+  const progFill = document.getElementById('prog-fill');
+  const progText = document.getElementById('prog-text');
+  progWrap.style.display = 'block';
+  progFill.style.width   = '15%';
+  progText.textContent   = 'Загрузка файла в хранилище...';
+  hideAlert('alert-upload');
+
+  try {
+    const ext      = _selFile.name.split('.').pop().toLowerCase();
+    const fileName = Date.now()+'_'+_selFile.name.replace(/\s+/g,'_');
+
+    // Загружаем в Supabase Storage
+    const storRes = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_ANON, 'Authorization': 'Bearer '+SB_ANON,
+        'Content-Type': _selFile.type||'application/octet-stream',
+        'x-upsert': 'true'
+      },
+      body: _selFile
+    });
+
+    progFill.style.width = '65%';
+    progText.textContent = 'Сохраняем в базу данных...';
+
+    if (!storRes.ok) {
+      const err = await storRes.json().catch(()=>({message:'Ошибка хранилища'}));
+      throw new Error(err.message||'Ошибка загрузки в Storage');
+    }
+
+    const fileUrl = `${SB_URL}/storage/v1/object/public/${BUCKET}/${fileName}`;
+
+    progFill.style.width = '85%';
+
+    // Записываем в pedagog_materials
+    await sb('pedagog_materials', {
+      method: 'POST',
+      body: JSON.stringify({
+        title, description: desc||null, section,
+        file_url: fileUrl, file_name: _selFile.name,
+        file_type: ext, uploaded_by: adminUser?.name||'admin'
+      })
+    });
+
+    progFill.style.width = '100%';
+    progText.textContent = '✅ Готово!';
+
+    showAlert('alert-upload','ok','✅ Файл опубликован! Он уже виден на портале в разделе "'+SEC_NAMES[section]+'"');
+    tgSend(`📁 Новый материал: <b>${title}</b>\nРаздел: ${SEC_NAMES[section]||section}\n👤 ${adminUser?.name}`);
+    toast('✅ Опубликовано!');
+
+    setTimeout(() => {
+      resetFile();
+      // Переходим на страницу материалов
+      showPg('materials', document.querySelector('[data-pg="materials"]'));
+    }, 2500);
+
+  } catch(e) {
+    showAlert('alert-upload','err','❌ Ошибка: '+e.message);
+    progWrap.style.display = 'none';
+    btn.disabled = false;
+    btn.innerHTML = '<span>🚀 Опубликовать на портале</span>';
+  }
+}
+
+/* ════════════════════════
+   МАТЕРИАЛЫ
+════════════════════════ */
+async function loadMaterials() {
+  const el     = document.getElementById('mat-list');
+  const filter = document.getElementById('mat-filter').value;
+  el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Загрузка...</div></div>';
+  try {
+    const q = filter
+      ? `pedagog_materials?section=eq.${filter}&select=*&order=created_at.desc`
+      : 'pedagog_materials?select=*&order=created_at.desc';
+    const mats = await sb(q);
+    if (!mats||!mats.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📁</div><div class="empty-text">Материалов нет</div></div>';
+      return;
+    }
+    el.innerHTML = mats.map(m => `
+      <div class="mat-card" id="mat-${m.id}">
+        <div class="mat-fi">${FILE_ICONS[m.file_type]||'📎'}</div>
+        <div class="mat-info">
+          <div class="mat-title">${esc(m.title)}</div>
+          ${m.description?`<div class="mat-desc">${esc(m.description)}</div>`:''}
+          <div class="mat-meta">
+            <span class="sec-badge">${SEC_NAMES[m.section]||m.section}</span>
+            <span class="mat-date">${new Date(m.created_at).toLocaleDateString('ru-RU')}</span>
+            ${m.uploaded_by?`<span class="mat-date">· ${esc(m.uploaded_by)}</span>`:''}
+          </div>
+        </div>
+        <div class="mat-actions">
+          ${m.file_url?`<button class="btn btn-ghost btn-xs" onclick="previewFile('${esc(m.file_url)}','${esc(m.title)}','${m.file_type}')">👁 Просмотр</button>`:''}
+          ${m.file_url?`<a href="${esc(m.file_url)}" target="_blank" class="btn btn-ghost btn-xs" style="text-decoration:none">⬇️</a>`:''}
+          <button class="btn btn-danger btn-xs" onclick="delMat('${m.id}')">🗑</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-text">Ошибка: ${esc(e.message)}</div></div>`; }
+}
+
+async function delMat(id) {
+  if (!confirm('Удалить материал?')) return;
+  try {
+    await sb(`pedagog_materials?id=eq.${id}`, {method:'DELETE'});
+    document.getElementById('mat-'+id)?.remove();
+    toast('✅ Удалено');
+  } catch(e) { toast('Ошибка: '+e.message,'err'); }
+}
+
+/* ══ ПРЕВЬЮ ФАЙЛА ══ */
+function previewFile(url, title, type) {
+  document.getElementById('preview-title').textContent = title;
+  const body = document.getElementById('preview-body');
+  if (type === 'pdf') {
+    body.innerHTML = `<iframe src="${url}" title="${esc(title)}"></iframe>`;
+  } else {
+    body.innerHTML = `
+      <div class="preview-pdf-hint">
+        <div style="font-size:48px;margin-bottom:12px">${FILE_ICONS[type]||'📎'}</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">${esc(title)}</div>
+        <div style="color:var(--text2);margin-bottom:20px">Просмотр в браузере недоступен для этого типа файла</div>
+        <a href="${url}" target="_blank" class="btn btn-primary" style="text-decoration:none;display:inline-flex">
+          ⬇️ Скачать файл
+        </a>
+      </div>`;
+  }
+  document.getElementById('preview-modal').style.display = 'flex';
+}
+function closePreview(e) {
+  if (!e || e.target === document.getElementById('preview-modal'))
+    document.getElementById('preview-modal').style.display = 'none';
+}
+
+/* ════════════════════════
+   ПЕДАГОГИ
+════════════════════════ */
+async function loadTeachers() {
+  const el = document.getElementById('teachers-list');
+  el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Загрузка...</div></div>';
+  try {
+    const rows = await sb('pedagog_users?role=eq.teacher&select=id,login,name,must_change_password,created_at&order=created_at.desc');
+    if (!rows||!rows.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">👩‍🏫</div><div class="empty-text">Педагогов нет</div></div>';
+      return;
+    }
+    el.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th></th><th>Имя</th><th>Логин</th><th>Статус</th><th>Добавлен</th><th></th></tr></thead>
+      <tbody>${rows.map(t=>`
+        <tr>
+          <td><div class="av">${(t.name||'?')[0].toUpperCase()}</div></td>
+          <td style="font-weight:700">${esc(t.name)}</td>
+          <td style="font-family:monospace;color:var(--text2)">${esc(t.login)}</td>
+          <td>${t.must_change_password
+            ? '<span class="badge badge-warn">⏳ Ожидает смены пароля</span>'
+            : '<span class="badge badge-ok">✅ Активен</span>'}</td>
+          <td style="color:var(--text3)">${new Date(t.created_at).toLocaleDateString('ru-RU')}</td>
+          <td><button class="btn btn-danger btn-xs" onclick="delUser('${t.id}','${esc(t.name)}')">🗑</button></td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-text">Ошибка: ${esc(e.message)}</div></div>`; }
+}
+
+async function addTeacher() {
+  const name  = document.getElementById('t-name').value.trim();
+  const login = document.getElementById('t-login').value.trim().toLowerCase();
+  const pwd   = document.getElementById('t-pwd').value.trim();
+
+  if (!name||!login||!pwd) { showAlert('alert-teacher','err','❌ Заполните все поля'); return; }
+  if (!/^[a-z0-9_]{3,30}$/.test(login)) { showAlert('alert-teacher','err','❌ Логин: латиница, цифры, _ (3-30 символов)'); return; }
+  if (pwd.length < 4) { showAlert('alert-teacher','err','❌ Пароль слишком короткий'); return; }
+
+  try {
+    const ex = await sb(`pedagog_users?login=eq.${encodeURIComponent(login)}&select=id&limit=1`);
+    if (ex&&ex.length) { showAlert('alert-teacher','err','❌ Логин уже занят'); return; }
+    const h = await sha256(SALT+pwd);
+    await sb('pedagog_users',{method:'POST',body:JSON.stringify({login,name,password_hash:h,role:'teacher',must_change_password:true})});
+    ['t-name','t-login','t-pwd'].forEach(id=>document.getElementById(id).value='');
+    showAlert('alert-teacher','ok',`✅ Педагог "${name}" создан! Логин: ${login} | Пароль: ${pwd}`);
+    tgSend(`➕ Новый педагог: <b>${name}</b> (${login})`);
+    loadTeachers();
+  } catch(e) { showAlert('alert-teacher','err','Ошибка: '+e.message); }
+}
+
+/* ════════════════════════
+   УЧАСТНИКИ
+════════════════════════ */
+async function loadUsers() {
+  const el = document.getElementById('users-list');
+  el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Загрузка...</div></div>';
+  try {
+    const rows = await sb('pedagog_users?select=id,login,name,role,created_at&order=created_at.desc');
+    if (!rows||!rows.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">Нет пользователей</div></div>';
+      return;
+    }
+    el.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th></th><th>Имя</th><th>Логин</th><th>Роль</th><th>Дата</th><th></th></tr></thead>
+      <tbody>${rows.map(u=>`
+        <tr>
+          <td><div class="av">${(u.name||'?')[0].toUpperCase()}</div></td>
+          <td style="font-weight:700">${esc(u.name)}</td>
+          <td style="font-family:monospace;color:var(--text2)">${esc(u.login)}</td>
+          <td><span class="badge ${u.role==='admin'?'badge-admin':'badge-teacher'}">${u.role}</span></td>
+          <td style="color:var(--text3)">${new Date(u.created_at).toLocaleDateString('ru-RU')}</td>
+          <td>${u.role!=='admin'?`<button class="btn btn-danger btn-xs" onclick="delUser('${u.id}','${esc(u.name)}')">🗑</button>`:''}</td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-text">Ошибка: ${esc(e.message)}</div></div>`; }
+}
+
+async function delUser(id, name) {
+  if (!confirm(`Удалить "${name}"?`)) return;
+  try {
+    await sb(`pedagog_users?id=eq.${id}`,{method:'DELETE'});
+    toast('✅ Удалено');
+    loadUsers(); loadTeachers();
+  } catch(e) { toast('Ошибка: '+e.message,'err'); }
+}
+</script>
+</body>
+</html>
